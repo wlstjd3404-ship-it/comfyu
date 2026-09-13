@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================
-# Vast.ai ComfyUI Provisioning (MiniMax-H3 전용)
+# Vast.ai & RunPod ComfyUI Provisioning (MiniMax-H3 전용)
 #   - 상세로그  : /workspace/provision.log
 #   - 실패요약  : /workspace/provision_FAILED.txt
 #   - 완료마커  : /workspace/.provision_done
@@ -28,10 +28,10 @@ log()  { echo "[..] $*"; }
 echo "===== MiniMax-H3 provisioning start: $(date) ====="
 
 # =============================================================
-# 0. python / ComfyUI 경로 탐색
+# 0. python / ComfyUI 경로 탐색 (RunPod + Vast.ai 자동 분기)
 # =============================================================
 PY=""
-for V in /venv/main /venv/comfyui /opt/environments/python/comfyui; do
+for V in /workspace/runpod-slim/venv /venv/main /venv/comfyui /opt/environments/python/comfyui; do
     [ -x "$V/bin/python" ] && PY="$V/bin/python" && break
 done
 [ -z "$PY" ] && PY="$(command -v python3)"
@@ -40,7 +40,7 @@ PIP=("$PY" -m pip)
 echo "[OK] python: $PY ($("$PY" -V 2>&1))"
 
 COMFY=""
-for C in /workspace/ComfyUI /opt/workspace-internal/ComfyUI /opt/ComfyUI "$HOME/ComfyUI"; do
+for C in /workspace/runpod-slim/ComfyUI /workspace/ComfyUI /opt/workspace-internal/ComfyUI /opt/ComfyUI "$HOME/ComfyUI"; do
     [ -f "$C/main.py" ] && COMFY="$C" && break
 done
 [ -z "$COMFY" ] && { fail "ComfyUI path not found"; exit 1; }
@@ -207,7 +207,7 @@ echo "===== MiniMax-H3 provisioning end: $(date) / failures=$FAILED ====="
 date > "$DONE"
 if [ "$FAILED" -eq 0 ]; then
     rm -f "$FAILLOG"
-    echo "ALL OK -> Vast 웹 콘솔에서 Reboot 권장."
+    echo "ALL OK -> 인스턴스 재부팅(Reboot) 권장."
 else
     echo "$FAILED failure(s) -> cat $FAILLOG"
 fi
