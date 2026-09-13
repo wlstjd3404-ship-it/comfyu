@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================
-# Vast.ai ComfyUI Provisioning (non-interactive / reboot-friendly)
-#   - 스크립트는 ComfyUI를 재시작하지 않는다. 끝나면 웹 콘솔에서 Reboot.
+# Vast.ai & RunPod ComfyUI Provisioning (non-interactive / reboot-friendly)
 #   - 상세로그  : /workspace/provision.log
 #   - 실패요약  : /workspace/provision_FAILED.txt   (없으면 전부 성공)
 #   - 완료마커  : /workspace/.provision_done        (재부팅 시 재실행 방지)
-#   - 재실행    : FORCE_PROVISION=1 bash /workspace/provision.sh
+#   - 재실행    : FORCE_PROVISION=1 bash /workspace/work.sh
 # =============================================================
 set -o pipefail
 
@@ -30,10 +29,10 @@ log()  { echo "[..] $*"; }
 echo "===== provisioning start: $(date) ====="
 
 # =============================================================
-# 0. python / ComfyUI 경로 (activate 의존 없음)
+# 0. python / ComfyUI 경로 탐색 (RunPod + Vast.ai 자동 분기)
 # =============================================================
 PY=""
-for V in /venv/main /venv/comfyui /opt/environments/python/comfyui; do
+for V in /workspace/runpod-slim/venv /venv/main /venv/comfyui /opt/environments/python/comfyui; do
     [ -x "$V/bin/python" ] && PY="$V/bin/python" && break
 done
 [ -z "$PY" ] && PY="$(command -v python3)"
@@ -42,14 +41,14 @@ PIP=("$PY" -m pip)
 echo "[OK] python: $PY ($("$PY" -V 2>&1))"
 
 COMFY=""
-for C in /workspace/ComfyUI /opt/workspace-internal/ComfyUI /opt/ComfyUI "$HOME/ComfyUI"; do
+for C in /workspace/runpod-slim/ComfyUI /workspace/ComfyUI /opt/workspace-internal/ComfyUI /opt/ComfyUI "$HOME/ComfyUI"; do
     [ -f "$C/main.py" ] && COMFY="$C" && break
 done
 [ -z "$COMFY" ] && { fail "ComfyUI path not found"; exit 1; }
 echo "[OK] ComfyUI: $COMFY"
 
 # =============================================================
-# 0-1. Civitai 인증 (Vast Environment Variables 로 주입 권장)
+# 0-1. Civitai 인증
 # =============================================================
 CIVITAI_TOKEN="${CIVITAI_TOKEN:-05420d5201ff5924e10b3bfaba6e6277}"
 CIVITAI_HOSTS=("https://civitai.com" "https://civitai.red")
@@ -140,7 +139,7 @@ dl_civitai_zip() {
 
         if [ "$code" = "200" ] && [ "$sz" -gt 10000 ] && unzip -tqq "$out_zip" >/dev/null 2>&1; then
             unzip -o -q "$out_zip" -d "$target_dir" || { fail "unzip $name"; return 1; }
-            # 중첩 폴더 평탄화 (ultralytics 로더는 하위폴더를 못 읽음)
+            # 중첩 폴더 평탄화
             find "$target_dir" -mindepth 2 -type f \( -name '*.pt' -o -name '*.pth' \) \
                  -exec mv -n {} "$target_dir"/ \; 2>/dev/null
             find "$target_dir" -mindepth 1 -type d -empty -delete 2>/dev/null
@@ -154,7 +153,7 @@ dl_civitai_zip() {
       done
     done
     rm -f "$out_zip"
-    fail "civitai $name (all hosts/modes failed — 위 응답본문 확인, 토큰 재발급 필요할 수 있음)"
+    fail "civitai $name (all hosts/modes failed)"
     return 1
 }
 
@@ -188,17 +187,11 @@ for f in anima-lllite-pose-1 anima-lllite-depth-1 \
          anima-lllite-any-test-like-v2; do
     dl_hf "https://huggingface.co/kohya-ss/Anima-LLLite/resolve/main/${f}.safetensors" \
           "$PATCH_DIR/${f}.safetensors" 100000
-    # ControlNet 노드로도 로드 가능하도록 양방향 지원
     [ -f "$PATCH_DIR/${f}.safetensors" ] && ln -sf "$PATCH_DIR/${f}.safetensors" "$CN_DIR/${f}.safetensors"
 done
 
-# --- 체크포인트 / 업스케일러: 워크플로에 맞게 주석 해제 ---
-# dl_hf "<checkpoint url>" "$COMFY/models/checkpoints/anima.safetensors"
-# dl_hf "https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x-UltraSharp.pth" \
-#       "$COMFY/models/upscale_models/4x-UltraSharp.pth"
-
 # =============================================================
-# 4. 커스텀 노드 (cd 의존 제거 — 절대경로 clone)
+# 4. 커스텀 노드
 # =============================================================
 NODE_DIR="$COMFY/custom_nodes"
 nodes=(
@@ -253,13 +246,13 @@ echo "[INFO] segm:"; ls -1 "$SEGM_DIR" 2>/dev/null
 echo "[INFO] model_patches:"; ls -1 "$PATCH_DIR" 2>/dev/null
 
 # =============================================================
-# 6. 마무리 (재시작하지 않음)
+# 6. 마무리
 # =============================================================
 echo "===== provisioning end: $(date) / failures=$FAILED ====="
 date > "$DONE"
 if [ "$FAILED" -eq 0 ]; then
     rm -f "$FAILLOG"
-    echo "ALL OK -> Vast 웹 콘솔에서 Reboot 하면 ComfyUI 가 새 노드로 기동됨."
+    echo "ALL OK -> 인스턴스 재부팅(Reboot) 권장."
 else
     echo "$FAILED failure(s) -> cat $FAILLOG"
 fi
