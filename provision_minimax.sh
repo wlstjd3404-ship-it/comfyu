@@ -174,7 +174,7 @@ dl_file "https://github.com/Kim2091/Kim2091-Models/releases/download/2x-AnimeSha
         "$COMFY/models/upscale_models/2x-AnimeSharpV4_RCAN.safetensors"
 
 # [latent_upscale_models]
-dl_file "https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler/resolve/main/minimax_h3_latent_upscaler_3d_bf16.safetensors" \
+dl_file "https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler/resolve/main/minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors?download=true" \
         "$COMFY/models/latent_upscale_models/minimax_h3_latent_upscaler_3d_bf16.safetensors"
 
 # =============================================================
