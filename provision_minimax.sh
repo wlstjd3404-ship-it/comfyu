@@ -21,8 +21,14 @@ if [ -f "$DONE" ] && [ -z "$FORCE_PROVISION" ]; then
 fi
 
 : > "$FAILLOG"
-FAILED=0
-fail() { echo "[FAIL] $*"; echo "$*" >> "$FAILLOG"; FAILED=$((FAILED+1)); }
+
+# Fail-Fast: 에러 발생 시 즉시 로그 기록 후 스크립트 중단
+fail() {
+    echo "[FAIL] $*" >&2
+    echo "$*" >> "$FAILLOG"
+    echo "===== MiniMax-H3 provisioning ABORTED: $(date) =====" >&2
+    exit 1
+}
 log()  { echo "[..] $*"; }
 
 echo "===== MiniMax-H3 provisioning start: $(date) ====="
@@ -35,7 +41,7 @@ for V in /workspace/runpod-slim/venv /venv/main /venv/comfyui /opt/environments/
     [ -x "$V/bin/python" ] && PY="$V/bin/python" && break
 done
 [ -z "$PY" ] && PY="$(command -v python3)"
-[ -z "$PY" ] && { fail "python not found"; exit 1; }
+[ -z "$PY" ] && fail "python not found"
 PIP=("$PY" -m pip)
 echo "[OK] python: $PY ($("$PY" -V 2>&1))"
 
@@ -43,7 +49,7 @@ COMFY=""
 for C in /workspace/runpod-slim/ComfyUI /workspace/ComfyUI /opt/workspace-internal/ComfyUI /opt/ComfyUI "$HOME/ComfyUI"; do
     [ -f "$C/main.py" ] && COMFY="$C" && break
 done
-[ -z "$COMFY" ] && { fail "ComfyUI path not found"; exit 1; }
+[ -z "$COMFY" ] && fail "ComfyUI path not found"
 echo "[OK] ComfyUI: $COMFY"
 
 # =============================================================
@@ -122,13 +128,14 @@ dl_civitai_file() {
     rm -f "$out" "$out.aria2"; mkdir -p "$dir"
     log "download civitai $name"
 
-    if [[ "$url" == *"?"* ]]; then
-        auth_url="${url}&token=${CIVITAI_TOKEN}"
+    # URL 토큰 파라미터만 주입 (Authorization 헤더 중복 전송 방지)
+    if [ -n "$CIVITAI_TOKEN" ]; then
+        [[ "$url" == *"?"* ]] && auth_url="${url}&token=${CIVITAI_TOKEN}" || auth_url="${url}?token=${CIVITAI_TOKEN}"
     else
-        auth_url="${url}?token=${CIVITAI_TOKEN}"
+        auth_url="$url"
     fi
 
-    if aria2c "${ARIA_OPTS[@]}" --header="Authorization: Bearer ${CIVITAI_TOKEN}" -d "$dir" -o "$name" "$auth_url" \
+    if aria2c "${ARIA_OPTS[@]}" -d "$dir" -o "$name" "$auth_url" \
        && [ "$(stat -c%s "$out" 2>/dev/null || echo 0)" -gt "$min" ]; then
         echo "[OK] $name ($(du -h "$out" | cut -f1))"
     else
@@ -139,8 +146,8 @@ dl_civitai_file() {
 # =============================================================
 # 3. 모델 다운로드
 # =============================================================
-# [diffusion_models] Civitai Model
-dl_civitai_file "https://civitai.red/api/download/models/3314675?fileId=3203130" \
+# [diffusion_models] Civitai Model (civitai.com 도메인 적용)
+dl_civitai_file "https://civitai.com/api/download/models/3314675?fileId=3203130" \
                 "$COMFY/models/diffusion_models/minimax_h3_diffusion.safetensors"
 
 # [vae]
@@ -188,7 +195,7 @@ for repo in "${nodes[@]}"; do
     else
         rm -rf "$path"
         git clone --depth 1 --recursive "$repo" "$path" >/dev/null 2>&1 \
-            || { fail "clone $name"; continue; }
+            || fail "clone $name"
         echo "[OK] clone $name"
     fi
     if [ -f "$path/requirements.txt" ]; then
@@ -203,11 +210,8 @@ done
 "$PY" -c "import torch,numpy;print('[OK] torch',torch.__version__,'cuda',torch.cuda.is_available(),'| numpy',numpy.__version__)" \
     || fail "torch/numpy broken"
 
-echo "===== MiniMax-H3 provisioning end: $(date) / failures=$FAILED ====="
+# 모든 단계 통과 시 완료 마커 생성
 date > "$DONE"
-if [ "$FAILED" -eq 0 ]; then
-    rm -f "$FAILLOG"
-    echo "ALL OK -> 인스턴스 재부팅(Reboot) 권장."
-else
-    echo "$FAILED failure(s) -> cat $FAILLOG"
-fi
+rm -f "$FAILLOG"
+echo "===== MiniMax-H3 provisioning end: $(date) ====="
+echo "ALL OK -> 인스턴스 재부팅(Reboot) 권장."
