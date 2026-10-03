@@ -147,7 +147,7 @@ dl_civitai_file() {
 # 3. 모델 다운로드
 # =============================================================
 # [diffusion_models] Civitai Model (civitai.com 도메인 적용)
-dl_civitai_file "https://civitai.red/api/download/models/3374439?fileId=3263048" \
+dl_civitai_file "https://civitai.red/api/download/models/3374445?fileId=3263052" \
                 "$COMFY/models/diffusion_models/minimax_h3_diffusion.safetensors"
 
 # [vae]
