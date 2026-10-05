@@ -209,6 +209,7 @@ nodes=(
     "https://github.com/Fannovel16/comfyui_controlnet_aux.git"
     "https://github.com/lonecatone23/ComfyUI_LC123_nodes.git"
     "https://github.com/Sen-sou/Comfyui-Anima-Regional-Conditioning.git"
+    "https://github.com/teenu/ComfyUI-Jakkanna.git"
 )
 for repo in "${nodes[@]}"; do
     name="$(basename "$repo" .git)"
